@@ -47,4 +47,271 @@ export const validarLogin = functions.https.onCall(async (data, context) => {
       console.error("Erro ao validar login:", error);
       return {success: false, message: "Erro ao validar login" };}
   });
-
+  export const cadastrarMedicamento = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    const { nomeDoMedicamento, tempoParaTomar } = data;
+    
+  
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+    
+   
+    const emailClient = context.auth.token.email;
+  
+  
+    const medicamentoRef = db.collection('medicamentos').doc();
+  
+    try {
+        await medicamentoRef.set({
+            email: emailClient,
+            nome_medicamento: nomeDoMedicamento,
+            tempo_para_tomar: tempoParaTomar
+        });
+        console.log("Cadastrado com sucesso!");
+        return { message: "Cadastrado com sucesso!" };
+    } catch (error) {
+        console.error("Problemas ao cadastrar", error);
+        throw new functions.https.HttpsError('internal', 'Problemas ao cadastrar.');
+    }
+  });
+  
+  export const consultarTodosOsMedicamentosDoEmail = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+    
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+    
+    
+    const emailClient = context.auth.token.email;
+  
+    try {
+       
+        const snapshot = await db.collection('medicamentos').where('email', '==', emailClient).get();
+        
+        
+        const medicamentos: { nome_medicamento: string, tempo_para_tomar: string }[] = [];
+        snapshot.forEach(doc => {
+            const medicamento = doc.data();
+            medicamentos.push({
+                nome_medicamento: medicamento.nome_medicamento,
+                tempo_para_tomar: medicamento.tempo_para_tomar
+            });
+        });
+  
+        return medicamentos;
+    } catch (error) {
+        console.error("Problemas ao consultar os medicamentos", error);
+        throw new functions.https.HttpsError('internal', 'Problemas ao consultar os medicamentos.');
+    }
+  });
+  export const editarMedicamento = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+  
+    // Verifica se o usuário está autenticado
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+  
+    // Obtém o email do usuário autenticado
+    const emailClient = context.auth.token.email;
+    
+    // Obtém os parâmetros passados
+    const { nomeDoMedicamento, tempoParaTomar } = data;
+  
+    try {
+        // Consulta o documento do medicamento do usuário
+        const medicamentoRef = db.collection('medicamentos').where('email', '==', emailClient).where('nome_medicamento', '==', nomeDoMedicamento);
+        const snapshot = await medicamentoRef.get();
+  
+        if (snapshot.empty) {
+            throw new functions.https.HttpsError('not-found', 'Medicamento não encontrado para este usuário.');
+        }
+  
+        // Atualiza o documento do medicamento
+        snapshot.forEach(doc => {
+            doc.ref.update({
+                tempo_para_tomar: tempoParaTomar
+            });
+        });
+  
+        console.log("As definições do remédio foram atualizadas!");
+        return { message: "As definições do remédio foram atualizadas!" };
+    } catch (error) {
+        console.error("Erro ao atualizar o medicamento:", error);
+        throw new functions.https.HttpsError('internal', 'Erro ao atualizar o medicamento.');
+    }
+  });
+  export const excluirMedicamento = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+  
+    // Verifica se o usuário está autenticado
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+  
+    // Obtém o email do usuário autenticado
+    const emailClient = context.auth.token.email;
+    
+    // Obtém os parâmetros passados
+    const { certeza, nomeDoMedicamento } = data;
+  
+    if (!certeza) {
+        throw new functions.https.HttpsError('invalid-argument', 'Confirmação necessária para excluir o medicamento.');
+    }
+  
+    try {
+        // Consulta o documento do medicamento do usuário
+        const medicamentoRef = db.collection('medicamentos').where('email', '==', emailClient).where('nome_medicamento', '==', nomeDoMedicamento);
+        const snapshot = await medicamentoRef.get();
+  
+        if (snapshot.empty) {
+            throw new functions.https.HttpsError('not-found', 'Medicamento não encontrado para este usuário.');
+        }
+  
+        // Exclui o documento do medicamento
+        snapshot.forEach(doc => {
+            doc.ref.delete();
+        });
+  
+        console.log("Medicamento excluído!");
+        return { message: "Medicamento excluído!" };
+    } catch (error) {
+        console.error("Erro ao excluir o medicamento:", error);
+        throw new functions.https.HttpsError('internal', 'Erro ao excluir o medicamento.');
+    }
+  });
+  export const cadastrarNovaConsulta = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+  
+    // Verifica se o usuário está autenticado
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+  
+    // Obtém o email do usuário autenticado
+    const emailClient = context.auth.token.email;
+  
+    // Obtém os parâmetros passados
+    const { dataConsulta, qualTipoDeConsulta } = data;
+  
+    try {
+        // Adiciona um novo documento de consulta
+        await db.collection('consultasmedicas').add({
+            emailpaciente: emailClient,
+            data: dataConsulta,
+            qualmedico: qualTipoDeConsulta
+        });
+  
+        console.log("Consulta Cadastrada!");
+        return { message: "Consulta Cadastrada!" };
+    } catch (error) {
+        console.error("Erro ao cadastrar a consulta:", error);
+        throw new functions.https.HttpsError('internal', 'Erro ao cadastrar a consulta.');
+    }
+  });
+  
+  export const editarConsulta = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+  
+    // Verifica se o usuário está autenticado
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+  
+    // Obtém o email do usuário autenticado
+    const emailClient = context.auth.token.email;
+  
+    // Obtém os parâmetros passados
+    const { dataConsulta, qualTipoDeConsulta } = data;
+  
+    try {
+        // Consulta o documento da consulta do usuário
+        const consultaRef = db.collection('consultasmedicas').where('emailpaciente', '==', emailClient).where('qualmedico', '==', qualTipoDeConsulta);
+        const snapshot = await consultaRef.get();
+  
+        if (snapshot.empty) {
+            throw new functions.https.HttpsError('not-found', 'Consulta não encontrada para este usuário.');
+        }
+  
+        // Atualiza o documento da consulta
+        snapshot.forEach(doc => {
+            doc.ref.update({
+                data: dataConsulta
+            });
+        });
+  
+        console.log("Consulta alterada!");
+        return { message: "Consulta alterada!" };
+    } catch (error) {
+        console.error("Erro ao alterar a consulta:", error);
+        throw new functions.https.HttpsError('internal', 'Erro ao alterar a consulta.');
+    }
+  });
+  
+  export const excluirConsulta = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+  
+    // Verifica se o usuário está autenticado
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+  
+    // Obtém o email do usuário autenticado
+    const emailClient = context.auth.token.email;
+  
+    // Obtém os parâmetros passados
+    const { qualTipoDeConsulta } = data;
+  
+    try {
+        // Consulta o documento da consulta do usuário
+        const consultaRef = db.collection('consultasmedicas').where('emailpaciente', '==', emailClient).where('qualmedico', '==', qualTipoDeConsulta);
+        const snapshot = await consultaRef.get();
+  
+        if (snapshot.empty) {
+            throw new functions.https.HttpsError('not-found', 'Consulta não encontrada para este usuário.');
+        }
+  
+        // Exclui o documento da consulta
+        snapshot.forEach(doc => {
+            doc.ref.delete();
+        });
+  
+        console.log("Consulta excluída!");
+        return { message: "Consulta excluída!" };
+    } catch (error) {
+        console.error("Erro ao excluir a consulta:", error);
+        throw new functions.https.HttpsError('internal', 'Erro ao excluir a consulta.');
+    }
+  });
+  
+  export const excluirTodasAsConsultasDoEmail = functions.https.onCall(async (data, context) => {
+    const db = admin.firestore();
+  
+    // Verifica se o usuário está autenticado
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Usuário não autenticado.');
+    }
+  
+    // Obtém o email do usuário autenticado
+    const emailClient = context.auth.token.email;
+  
+    try {
+        // Consulta todos os documentos de consultas do usuário
+        const snapshot = await db.collection('consultasmedicas').where('emailpaciente', '==', emailClient).get();
+        
+        // Exclui todos os documentos encontrados
+        const batch = db.batch();
+        snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+  
+        console.log("Todas as consultas excluídas!");
+        return { message: "Todas as consultas excluídas!" };
+    } catch (error) {
+        console.error("Erro ao excluir as consultas:", error);
+        throw new functions.https.HttpsError('internal', 'Erro ao excluir as consultas.');
+    }
+  });
